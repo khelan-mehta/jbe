@@ -69,57 +69,86 @@ async function getPhilosophicalCritique(content) {
           role: "system",
           content: `You are a philosophical analysis assistant. Analyze journal entries and create intellectual debates between TWO relevant philosophers who have written about the themes present.
 
-Your response MUST follow this EXACT JSON structure:
+CRITICAL: You MUST respond with ONLY valid JSON. No other text before or after. The JSON must follow this EXACT structure:
+
 {
-  "philosophers": ["Philosopher 1 Name", "Philosopher 2 Name"],
+  "philosophers": ["Philosopher 1 Full Name", "Philosopher 2 Full Name"],
   "debate": [
-    {"speaker": "Philosopher 1 Name", "argument": "First argument from Philosopher 1"},
-    {"speaker": "Philosopher 2 Name", "argument": "Counter-argument from Philosopher 2"},
-    {"speaker": "Philosopher 1 Name", "argument": "Second argument from Philosopher 1"},
-    {"speaker": "Philosopher 2 Name", "argument": "Second counter-argument"},
-    {"speaker": "Philosopher 1 Name", "argument": "Third argument"},
-    {"speaker": "Philosopher 2 Name", "argument": "Third counter-argument"},
-    {"speaker": "Philosopher 1 Name", "argument": "Fourth argument"},
-    {"speaker": "Philosopher 2 Name", "argument": "Fourth counter-argument"},
-    {"speaker": "Philosopher 1 Name", "argument": "Fifth and final argument"},
-    {"speaker": "Philosopher 2 Name", "argument": "Fifth and final counter-argument"}
+    {"speaker": "Philosopher 1 Full Name", "argument": "First argument from Philosopher 1 about the journal entry (2-3 sentences)"},
+    {"speaker": "Philosopher 2 Full Name", "argument": "Counter-argument from Philosopher 2 (2-3 sentences)"},
+    {"speaker": "Philosopher 1 Full Name", "argument": "Second argument from Philosopher 1"},
+    {"speaker": "Philosopher 2 Full Name", "argument": "Second counter-argument"},
+    {"speaker": "Philosopher 1 Full Name", "argument": "Third argument"},
+    {"speaker": "Philosopher 2 Full Name", "argument": "Third counter-argument"},
+    {"speaker": "Philosopher 1 Full Name", "argument": "Fourth argument"},
+    {"speaker": "Philosopher 2 Full Name", "argument": "Fourth counter-argument"},
+    {"speaker": "Philosopher 1 Full Name", "argument": "Fifth and final argument"},
+    {"speaker": "Philosopher 2 Full Name", "argument": "Fifth and final counter-argument"}
   ],
   "resources": [
-    {"title": "Primary work by Philosopher 1", "url": "real accessible URL"},
-    {"title": "Primary work by Philosopher 2", "url": "real accessible URL"},
-    {"title": "Stanford Encyclopedia entry or academic article", "url": "real URL"},
-    {"title": "Additional relevant resource", "url": "real URL"}
+    {"title": "Primary work by Philosopher 1", "url": "https://real-accessible-url.com"},
+    {"title": "Primary work by Philosopher 2", "url": "https://real-accessible-url.com"},
+    {"title": "Stanford Encyclopedia entry or academic article", "url": "https://plato.stanford.edu/..."},
+    {"title": "Additional relevant resource", "url": "https://real-url.com"}
   ]
 }
 
 Guidelines:
-- Choose philosophers whose actual theories directly relate to the themes
+- Choose philosophers whose actual theories directly relate to the themes (existentialism, ethics, meaning, identity, relationships, etc.)
 - Each argument should be 2-3 sentences, directly addressing the journal entry's themes
 - Arguments should build on each other, creating a genuine philosophical dialogue
-- Resources must be real, accessible URLs (Stanford Encyclopedia, Internet Archive, academic repositories)
-- Focus on: ethics, existentialism, meaning, identity, relationships, or other relevant philosophical domains`,
+- Resources must be real, accessible URLs (prefer Stanford Encyclopedia of Philosophy, Internet Archive, Project Gutenberg, academic repositories)
+- NO explanatory text outside the JSON structure`,
         },
         {
           role: "user",
-          content: `Analyze this journal entry and create a philosophical debate:\n\n${content}`,
+          content: `Analyze this journal entry and create a philosophical debate. Respond with ONLY the JSON structure, nothing else:\n\n${content}`,
         },
       ],
-      max_tokens: 1500,
+      max_tokens: 2000,
       temperature: 0.7,
-      response_format: { type: "json_object" },
     });
 
-    const result = JSON.parse(completion.choices[0].message.content);
+    const responseText = completion.choices[0].message.content.trim();
+
+    // Try to extract JSON if there's extra text
+    let jsonText = responseText;
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      jsonText = jsonMatch[0];
+    }
+
+    const result = JSON.parse(jsonText);
+
+    // Validate the structure
+    if (
+      !result.philosophers ||
+      !Array.isArray(result.philosophers) ||
+      result.philosophers.length !== 2
+    ) {
+      throw new Error("Invalid philosophers array");
+    }
+    if (
+      !result.debate ||
+      !Array.isArray(result.debate) ||
+      result.debate.length < 2
+    ) {
+      throw new Error("Invalid debate array");
+    }
+    if (!result.resources || !Array.isArray(result.resources)) {
+      throw new Error("Invalid resources array");
+    }
+
     return result;
   } catch (error) {
     console.error("OpenAI API Error:", error);
     return {
-      philosophers: ["Error", "Error"],
+      philosophers: ["System", "Error"],
       debate: [
         {
           speaker: "System",
           argument:
-            "Unable to generate philosophical critique. Please check your OpenAI API configuration.",
+            "Unable to generate philosophical critique at this time. Please check your OpenAI API configuration and try again.",
         },
       ],
       resources: [],
