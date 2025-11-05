@@ -96,11 +96,8 @@ CRITICAL: You MUST respond with ONLY valid JSON. No other text before or after. 
     {"speaker": "Philosopher 2 Full Name", "statement": "Final response offering their concluding perspective and practical wisdom drawn from their philosophy (2-3 sentences)"}
   ],
   "resources": [
-    {"title": "Primary work by Philosopher 1 (book or key text)", "url": "https://real-accessible-url.com"},
-    {"title": "Primary work by Philosopher 2 (book or key text)", "url": "https://real-accessible-url.com"},
-    {"title": "Stanford Encyclopedia entry on Philosopher 1", "url": "https://plato.stanford.edu/entries/..."},
-    {"title": "Stanford Encyclopedia entry on Philosopher 2", "url": "https://plato.stanford.edu/entries/..."},
-    {"title": "Academic article or comparison of both philosophers", "url": "https://real-url.com"}
+    {"title": "Short, readable article/essay on the philosophical topic at hand (5,000-15,000 words max)", "url": "https://real-accessible-url.com"},
+    {"title": "Another short, accessible article/essay on the core themes discussed (5,000-15,000 words max)", "url": "https://real-accessible-url.com"}
   ]
 }
 
@@ -113,12 +110,20 @@ Guidelines:
 - Arguments should progressively deepen, not repeat. Each exchange should advance the discussion
 - Reference specific philosophical concepts (e.g., Sartre's "bad faith", Kant's "categorical imperative", Nietzsche's "will to power")
 - The dialogue should ultimately provide practical insight for the journal writer
-- Resources must be real, accessible URLs (Stanford Encyclopedia of Philosophy, Internet Archive, Project Gutenberg, JSTOR open access, academic repositories)
+
+RESOURCES REQUIREMENTS (CRITICAL):
+- Provide EXACTLY 2 resources (not 4 or 5)
+- Resources should be SHORT, accessible articles/essays that can be read in one sitting (approximately 1-3 hours)
+- Prefer: Stanford Encyclopedia entries (these are typically 5,000-15,000 words), Internet Encyclopedia of Philosophy, accessible academic articles, or well-written blog posts by philosophers
+- Resources should directly address the THEMES and ARGUMENTS in the journal entry, not just biographies of the philosophers
+- Examples of good resources: "The Absurd" by Thomas Nagel, "What is it Like to be a Bat?", Stanford Encyclopedia entries, essays from philosophy journals
+- Avoid: Full books, very long academic papers (30+ pages), paywalled content
+- URLs must be real and accessible (prefer .edu, plato.stanford.edu, iep.utm.edu, or established philosophy websites)
 - NO explanatory text outside the JSON structure`,
         },
         {
           role: "user",
-          content: `Analyze this journal entry philosophically. First, have each philosopher provide their individual critique. Then, create a dialogue where they discuss and build upon each other's perspectives. Respond with ONLY the JSON structure:\n\n${content}`,
+          content: `Analyze this journal entry philosophically. First, have each philosopher provide their individual critique. Then, create a dialogue where they discuss and build upon each other's perspectives. Provide exactly 2 short, readable resources (articles/essays that can be read in a day) related to the philosophical themes discussed. Respond with ONLY the JSON structure:\n\n${content}`,
         },
       ],
       max_tokens: 2500,
