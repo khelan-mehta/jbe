@@ -20,12 +20,12 @@ mongoose
   .then(() => console.log("✅ Connected to MongoDB Atlas"))
   .catch((err) => console.error("❌ MongoDB connection error:", err));
 
-// OpenAI Configuration - EDIT YOUR API KEY HERE
+// OpenAI Configuration
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "",
 });
 
-// Entry Schema - Updated to include critique
+// Entry Schema - Updated to include philosophical debate
 const entrySchema = new mongoose.Schema({
   date: {
     type: String,
@@ -40,6 +40,14 @@ const entrySchema = new mongoose.Schema({
     type: String,
     default: "",
   },
+  philosophers: {
+    type: Array,
+    default: [],
+  },
+  resources: {
+    type: Array,
+    default: [],
+  },
   timestamp: {
     type: Date,
     default: Date.now,
@@ -48,33 +56,74 @@ const entrySchema = new mongoose.Schema({
 
 const Entry = mongoose.model("Entry", entrySchema);
 
-// Password (same as frontend)
+// Password
 const PASSWORD = "nalehK05@";
 
-// Function to get AI critique
-async function getAICritique(content) {
+// Function to get philosophical debate and critique
+async function getPhilosophicalCritique(content) {
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4",
       messages: [
         {
           role: "system",
-          content:
-            "You are a thoughtful journal critic and life coach. Provide sharp, insightful, and constructive critique of journal entries. Focus on: 1) Emotional patterns and self-awareness, 2) Problem-solving approaches, 3) Growth opportunities, 4) Contradictions or blind spots, 5) Actionable advice. Be direct but supportive. Keep responses concise (3-5 sentences) and impactful.",
+          content: `You are a philosophical analysis assistant. Analyze journal entries and create intellectual debates between TWO relevant philosophers who have written about the themes present.
+
+Your response MUST follow this EXACT JSON structure:
+{
+  "philosophers": ["Philosopher 1 Name", "Philosopher 2 Name"],
+  "debate": [
+    {"speaker": "Philosopher 1 Name", "argument": "First argument from Philosopher 1"},
+    {"speaker": "Philosopher 2 Name", "argument": "Counter-argument from Philosopher 2"},
+    {"speaker": "Philosopher 1 Name", "argument": "Second argument from Philosopher 1"},
+    {"speaker": "Philosopher 2 Name", "argument": "Second counter-argument"},
+    {"speaker": "Philosopher 1 Name", "argument": "Third argument"},
+    {"speaker": "Philosopher 2 Name", "argument": "Third counter-argument"},
+    {"speaker": "Philosopher 1 Name", "argument": "Fourth argument"},
+    {"speaker": "Philosopher 2 Name", "argument": "Fourth counter-argument"},
+    {"speaker": "Philosopher 1 Name", "argument": "Fifth and final argument"},
+    {"speaker": "Philosopher 2 Name", "argument": "Fifth and final counter-argument"}
+  ],
+  "resources": [
+    {"title": "Primary work by Philosopher 1", "url": "real accessible URL"},
+    {"title": "Primary work by Philosopher 2", "url": "real accessible URL"},
+    {"title": "Stanford Encyclopedia entry or academic article", "url": "real URL"},
+    {"title": "Additional relevant resource", "url": "real URL"}
+  ]
+}
+
+Guidelines:
+- Choose philosophers whose actual theories directly relate to the themes
+- Each argument should be 2-3 sentences, directly addressing the journal entry's themes
+- Arguments should build on each other, creating a genuine philosophical dialogue
+- Resources must be real, accessible URLs (Stanford Encyclopedia, Internet Archive, academic repositories)
+- Focus on: ethics, existentialism, meaning, identity, relationships, or other relevant philosophical domains`,
         },
         {
           role: "user",
-          content: `Provide a sharp critique and reflection on this journal entry:\n\n${content}`,
+          content: `Analyze this journal entry and create a philosophical debate:\n\n${content}`,
         },
       ],
-      max_tokens: 300,
-      temperature: 0.8,
+      max_tokens: 1500,
+      temperature: 0.7,
+      response_format: { type: "json_object" },
     });
 
-    return completion.choices[0].message.content.trim();
+    const result = JSON.parse(completion.choices[0].message.content);
+    return result;
   } catch (error) {
     console.error("OpenAI API Error:", error);
-    return "Unable to generate critique at this time. Please check your OpenAI API configuration.";
+    return {
+      philosophers: ["Error", "Error"],
+      debate: [
+        {
+          speaker: "System",
+          argument:
+            "Unable to generate philosophical critique. Please check your OpenAI API configuration.",
+        },
+      ],
+      resources: [],
+    };
   }
 }
 
@@ -100,12 +149,11 @@ app.get("/api/entries", async (req, res) => {
   }
 });
 
-// Create new entry with AI critique
+// Create new entry with philosophical critique
 app.post("/api/entries", async (req, res) => {
   try {
     const { content, date } = req.body;
 
-    // Check if entry for this date already exists
     const existingEntry = await Entry.findOne({ date });
     if (existingEntry) {
       return res
@@ -113,13 +161,14 @@ app.post("/api/entries", async (req, res) => {
         .json({ error: "Entry for this date already exists" });
     }
 
-    // Get AI critique
-    const critique = await getAICritique(content);
+    const philosophicalAnalysis = await getPhilosophicalCritique(content);
 
     const entry = new Entry({
       date,
       content,
-      critique,
+      critique: JSON.stringify(philosophicalAnalysis.debate),
+      philosophers: philosophicalAnalysis.philosophers,
+      resources: philosophicalAnalysis.resources,
       timestamp: new Date(),
     });
 
@@ -131,19 +180,20 @@ app.post("/api/entries", async (req, res) => {
   }
 });
 
-// Update entry with new AI critique
+// Update entry with new philosophical critique
 app.put("/api/entries/:id", async (req, res) => {
   try {
     const { content } = req.body;
 
-    // Get new AI critique for updated content
-    const critique = await getAICritique(content);
+    const philosophicalAnalysis = await getPhilosophicalCritique(content);
 
     const entry = await Entry.findByIdAndUpdate(
       req.params.id,
       {
         content,
-        critique,
+        critique: JSON.stringify(philosophicalAnalysis.debate),
+        philosophers: philosophicalAnalysis.philosophers,
+        resources: philosophicalAnalysis.resources,
         timestamp: new Date(),
       },
       { new: true }
