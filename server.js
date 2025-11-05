@@ -59,8 +59,10 @@ const Entry = mongoose.model("Entry", entrySchema);
 // Password
 const PASSWORD = "nalehK05@";
 
-// Function to get philosophical debate and critique
-async function getPhilosophicalCritique(content) {
+// Function to get philosophical debate and critique with retry logic
+async function getPhilosophicalCritique(content, attempt = 1) {
+  const maxAttempts = 3;
+
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4",
@@ -102,6 +104,8 @@ CRITICAL: You MUST respond with ONLY valid JSON. No other text before or after. 
   ]
 }
 
+IMPORTANT: The "dialogue" array MUST contain at least 8 objects with "speaker" and "statement" fields. Each "statement" must be a non-empty string.
+
 Guidelines:
 - Choose philosophers whose actual theories directly relate to the themes (existentialism, ethics, epistemology, meaning, identity, relationships, political philosophy, etc.)
 - Individual critiques should clearly reflect each philosopher's unique theoretical framework
@@ -141,28 +145,66 @@ Guidelines:
       throw new Error("Invalid philosophers array");
     }
     if (
-      !result.debate ||
-      !Array.isArray(result.debate) ||
-      result.debate.length < 2
+      !result.individualCritiques ||
+      !Array.isArray(result.individualCritiques) ||
+      result.individualCritiques.length !== 2
     ) {
-      throw new Error("Invalid debate array");
+      throw new Error("Invalid individual critiques array");
     }
+    if (
+      !result.dialogue ||
+      !Array.isArray(result.dialogue) ||
+      result.dialogue.length < 2
+    ) {
+      throw new Error("Invalid dialogue array");
+    }
+
+    // Validate dialogue structure
+    for (const exchange of result.dialogue) {
+      if (
+        !exchange.speaker ||
+        !exchange.statement ||
+        typeof exchange.statement !== "string" ||
+        exchange.statement.trim() === ""
+      ) {
+        throw new Error(
+          "Invalid dialogue structure - missing speaker or statement"
+        );
+      }
+    }
+
     if (!result.resources || !Array.isArray(result.resources)) {
       throw new Error("Invalid resources array");
     }
 
     return result;
   } catch (error) {
-    console.error("OpenAI API Error:", error);
+    console.error(
+      `OpenAI API Error (Attempt ${attempt}/${maxAttempts}):`,
+      error.message
+    );
+
+    // Retry logic
+    if (attempt < maxAttempts) {
+      console.log(`Retrying... (Attempt ${attempt + 1}/${maxAttempts})`);
+      // Wait a bit before retrying (exponential backoff)
+      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+      return getPhilosophicalCritique(content, attempt + 1);
+    }
+
+    // After 3 failed attempts, return error response
+    console.error(
+      `Failed to generate philosophical critique after ${maxAttempts} attempts`
+    );
     return {
       philosophers: ["System", "Error"],
-      debate: [
+      individualCritiques: [
         {
-          speaker: "System",
-          argument:
-            "Unable to generate philosophical critique at this time. Please check your OpenAI API configuration and try again.",
+          philosopher: "System",
+          critique: `Failed to generate philosophical critique after ${maxAttempts} attempts. The AI service may be experiencing issues. Please try again later or check your API configuration.`,
         },
       ],
+      dialogue: [],
       resources: [],
     };
   }
@@ -207,7 +249,10 @@ app.post("/api/entries", async (req, res) => {
     const entry = new Entry({
       date,
       content,
-      critique: JSON.stringify(philosophicalAnalysis.debate),
+      critique: JSON.stringify({
+        individualCritiques: philosophicalAnalysis.individualCritiques,
+        dialogue: philosophicalAnalysis.dialogue,
+      }),
       philosophers: philosophicalAnalysis.philosophers,
       resources: philosophicalAnalysis.resources,
       timestamp: new Date(),
@@ -232,7 +277,10 @@ app.put("/api/entries/:id", async (req, res) => {
       req.params.id,
       {
         content,
-        critique: JSON.stringify(philosophicalAnalysis.debate),
+        critique: JSON.stringify({
+          individualCritiques: philosophicalAnalysis.individualCritiques,
+          dialogue: philosophicalAnalysis.dialogue,
+        }),
         philosophers: philosophicalAnalysis.philosophers,
         resources: philosophicalAnalysis.resources,
         timestamp: new Date(),
