@@ -67,45 +67,57 @@ async function getPhilosophicalCritique(content) {
       messages: [
         {
           role: "system",
-          content: `You are a philosophical analysis assistant. Analyze journal entries and create intellectual debates between TWO relevant philosophers who have written about the themes present.
+          content: `You are a philosophical analysis assistant. Analyze journal entries and orchestrate a deep philosophical discussion between TWO relevant philosophers.
 
 CRITICAL: You MUST respond with ONLY valid JSON. No other text before or after. The JSON must follow this EXACT structure:
 
 {
   "philosophers": ["Philosopher 1 Full Name", "Philosopher 2 Full Name"],
-  "debate": [
-    {"speaker": "Philosopher 1 Full Name", "argument": "First argument from Philosopher 1 about the journal entry (2-3 sentences)"},
-    {"speaker": "Philosopher 2 Full Name", "argument": "Counter-argument from Philosopher 2 (2-3 sentences)"},
-    {"speaker": "Philosopher 1 Full Name", "argument": "Second argument from Philosopher 1"},
-    {"speaker": "Philosopher 2 Full Name", "argument": "Second counter-argument"},
-    {"speaker": "Philosopher 1 Full Name", "argument": "Third argument"},
-    {"speaker": "Philosopher 2 Full Name", "argument": "Third counter-argument"},
-    {"speaker": "Philosopher 1 Full Name", "argument": "Fourth argument"},
-    {"speaker": "Philosopher 2 Full Name", "argument": "Fourth counter-argument"},
-    {"speaker": "Philosopher 1 Full Name", "argument": "Fifth and final argument"},
-    {"speaker": "Philosopher 2 Full Name", "argument": "Fifth and final counter-argument"}
+  "individualCritiques": [
+    {
+      "philosopher": "Philosopher 1 Full Name",
+      "critique": "A thoughtful 3-4 sentence analysis of the journal entry from this philosopher's unique perspective, citing their core theories and how they apply to the situation described. Be specific about their philosophical framework."
+    },
+    {
+      "philosopher": "Philosopher 2 Full Name", 
+      "critique": "A thoughtful 3-4 sentence analysis from a contrasting philosophical perspective, highlighting how their theories offer a different lens on the same situation."
+    }
+  ],
+  "dialogue": [
+    {"speaker": "Philosopher 1 Full Name", "statement": "Opening statement responding to Philosopher 2's critique, finding points of agreement or disagreement (2-3 sentences)"},
+    {"speaker": "Philosopher 2 Full Name", "statement": "Response that builds on or challenges Philosopher 1's point, introducing a new dimension to consider (2-3 sentences)"},
+    {"speaker": "Philosopher 1 Full Name", "statement": "Deeper analysis that references specific concepts from their work, engaging with Philosopher 2's counterpoint (2-3 sentences)"},
+    {"speaker": "Philosopher 2 Full Name", "statement": "Further development that either synthesizes both views or sharpens the distinction, bringing in their own theoretical framework (2-3 sentences)"},
+    {"speaker": "Philosopher 1 Full Name", "statement": "Nuanced response that acknowledges complexity while maintaining their philosophical stance (2-3 sentences)"},
+    {"speaker": "Philosopher 2 Full Name", "statement": "Builds upon the previous exchange, perhaps finding common ground or identifying irreconcilable differences (2-3 sentences)"},
+    {"speaker": "Philosopher 1 Full Name", "statement": "Penultimate statement that ties their argument back to the journal entry with actionable philosophical insight (2-3 sentences)"},
+    {"speaker": "Philosopher 2 Full Name", "statement": "Final response offering their concluding perspective and practical wisdom drawn from their philosophy (2-3 sentences)"}
   ],
   "resources": [
-    {"title": "Primary work by Philosopher 1", "url": "https://real-accessible-url.com"},
-    {"title": "Primary work by Philosopher 2", "url": "https://real-accessible-url.com"},
-    {"title": "Stanford Encyclopedia entry or academic article", "url": "https://plato.stanford.edu/..."},
-    {"title": "Additional relevant resource", "url": "https://real-url.com"}
+    {"title": "Primary work by Philosopher 1 (book or key text)", "url": "https://real-accessible-url.com"},
+    {"title": "Primary work by Philosopher 2 (book or key text)", "url": "https://real-accessible-url.com"},
+    {"title": "Stanford Encyclopedia entry on Philosopher 1", "url": "https://plato.stanford.edu/entries/..."},
+    {"title": "Stanford Encyclopedia entry on Philosopher 2", "url": "https://plato.stanford.edu/entries/..."},
+    {"title": "Academic article or comparison of both philosophers", "url": "https://real-url.com"}
   ]
 }
 
 Guidelines:
-- Choose philosophers whose actual theories directly relate to the themes (existentialism, ethics, meaning, identity, relationships, etc.)
-- Each argument should be 2-3 sentences, directly addressing the journal entry's themes
-- Arguments should build on each other, creating a genuine philosophical dialogue
-- Resources must be real, accessible URLs (prefer Stanford Encyclopedia of Philosophy, Internet Archive, Project Gutenberg, academic repositories)
+- Choose philosophers whose actual theories directly relate to the themes (existentialism, ethics, epistemology, meaning, identity, relationships, political philosophy, etc.)
+- Individual critiques should clearly reflect each philosopher's unique theoretical framework
+- The dialogue should feel like a genuine intellectual conversation where they listen, respond, and build upon each other's ideas
+- Arguments should progressively deepen, not repeat. Each exchange should advance the discussion
+- Reference specific philosophical concepts (e.g., Sartre's "bad faith", Kant's "categorical imperative", Nietzsche's "will to power")
+- The dialogue should ultimately provide practical insight for the journal writer
+- Resources must be real, accessible URLs (Stanford Encyclopedia of Philosophy, Internet Archive, Project Gutenberg, JSTOR open access, academic repositories)
 - NO explanatory text outside the JSON structure`,
         },
         {
           role: "user",
-          content: `Analyze this journal entry and create a philosophical debate. Respond with ONLY the JSON structure, nothing else:\n\n${content}`,
+          content: `Analyze this journal entry philosophically. First, have each philosopher provide their individual critique. Then, create a dialogue where they discuss and build upon each other's perspectives. Respond with ONLY the JSON structure:\n\n${content}`,
         },
       ],
-      max_tokens: 2000,
+      max_tokens: 2500,
       temperature: 0.7,
     });
 
