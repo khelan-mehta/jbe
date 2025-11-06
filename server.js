@@ -25,7 +25,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "",
 });
 
-// Entry Schema - Updated to include philosophical debate
+// Entry Schema
 const entrySchema = new mongoose.Schema({
   date: {
     type: String,
@@ -56,10 +56,46 @@ const entrySchema = new mongoose.Schema({
 
 const Entry = mongoose.model("Entry", entrySchema);
 
+// Task Schema - Updated with new fields
+const taskSchema = new mongoose.Schema({
+  text: {
+    type: String,
+    required: true,
+  },
+  completed: {
+    type: Boolean,
+    default: false,
+  },
+  priority: {
+    type: String,
+    enum: ["low", "medium", "high"],
+    default: "medium",
+  },
+  category: {
+    type: String,
+    enum: ["personal", "work", "study", "health", "other"],
+    default: "personal",
+  },
+  dueDate: {
+    type: String,
+    default: null,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+  completedAt: {
+    type: Date,
+    default: null,
+  },
+});
+
+const Task = mongoose.model("Task", taskSchema);
+
 // Password
 const PASSWORD = "nalehK05@";
 
-// Function to get philosophical debate and critique with retry logic
+// Function to get philosophical critique
 async function getPhilosophicalCritique(content, attempt = 1) {
   const maxAttempts = 3;
 
@@ -104,21 +140,12 @@ CRITICAL: You MUST respond with ONLY valid JSON. No other text before or after. 
 IMPORTANT: The "dialogue" array MUST contain at least 8 objects with "speaker" and "statement" fields. Each "statement" must be a non-empty string.
 
 Guidelines:
-- Choose philosophers whose actual theories directly relate to the themes (existentialism, ethics, epistemology, meaning, identity, relationships, political philosophy, etc.)
+- Choose philosophers whose actual theories directly relate to the themes
 - Individual critiques should clearly reflect each philosopher's unique theoretical framework
-- The dialogue should feel like a genuine intellectual conversation where they listen, respond, and build upon each other's ideas
-- Arguments should progressively deepen, not repeat. Each exchange should advance the discussion
-- Reference specific philosophical concepts (e.g., Sartre's "bad faith", Kant's "categorical imperative", Nietzsche's "will to power")
-- The dialogue should ultimately provide practical insight for the journal writer
-
-RESOURCES REQUIREMENTS (CRITICAL):
-- Provide EXACTLY 2 resources (not 4 or 5)
-- Resources should be SHORT, accessible articles/essays that can be read in one sitting (approximately 1-3 hours)
-- Prefer: Stanford Encyclopedia entries (these are typically 5,000-15,000 words), Internet Encyclopedia of Philosophy, accessible academic articles, or well-written blog posts by philosophers
-- Resources should directly address the THEMES and ARGUMENTS in the journal entry, not just biographies of the philosophers
-- Examples of good resources: "The Absurd" by Thomas Nagel, "What is it Like to be a Bat?", Stanford Encyclopedia entries, essays from philosophy journals
-- Avoid: Full books, very long academic papers (30+ pages), paywalled content
-- URLs must be real and accessible (prefer .edu, plato.stanford.edu, iep.utm.edu, or established philosophy websites)
+- The dialogue should feel like a genuine intellectual conversation
+- Arguments should progressively deepen, not repeat
+- Reference specific philosophical concepts
+- Provide EXACTLY 2 short, accessible resources (articles/essays)
 - NO explanatory text outside the JSON structure`,
         },
         {
@@ -192,7 +219,6 @@ RESOURCES REQUIREMENTS (CRITICAL):
     // Retry logic
     if (attempt < maxAttempts) {
       console.log(`Retrying... (Attempt ${attempt + 1}/${maxAttempts})`);
-      // Wait a bit before retrying (exponential backoff)
       await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
       return getPhilosophicalCritique(content, attempt + 1);
     }
@@ -215,28 +241,6 @@ RESOURCES REQUIREMENTS (CRITICAL):
   }
 }
 
-// Task Schema
-const taskSchema = new mongoose.Schema({
-  text: {
-    type: String,
-    required: true,
-  },
-  completed: {
-    type: Boolean,
-    default: false,
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-  completedAt: {
-    type: Date,
-    default: null,
-  },
-});
-
-const Task = mongoose.model("Task", taskSchema);
-
 // Task Routes
 
 // Get all tasks
@@ -252,7 +256,7 @@ app.get("/api/tasks", async (req, res) => {
 // Create new task
 app.post("/api/tasks", async (req, res) => {
   try {
-    const { text } = req.body;
+    const { text, priority, category, dueDate } = req.body;
 
     if (!text || !text.trim()) {
       return res.status(400).json({ error: "Task text is required" });
@@ -260,6 +264,9 @@ app.post("/api/tasks", async (req, res) => {
 
     const task = new Task({
       text: text.trim(),
+      priority: priority || "medium",
+      category: category || "personal",
+      dueDate: dueDate || null,
       completed: false,
       createdAt: new Date(),
     });
@@ -272,19 +279,26 @@ app.post("/api/tasks", async (req, res) => {
   }
 });
 
-// Update task (toggle completion)
+// Update task
 app.put("/api/tasks/:id", async (req, res) => {
   try {
-    const { completed } = req.body;
+    const { completed, text, priority, category, dueDate } = req.body;
 
-    const task = await Task.findByIdAndUpdate(
-      req.params.id,
-      {
-        completed,
-        completedAt: completed ? new Date() : null,
-      },
-      { new: true }
-    );
+    const updateData = {};
+
+    if (text !== undefined) updateData.text = text;
+    if (priority !== undefined) updateData.priority = priority;
+    if (category !== undefined) updateData.category = category;
+    if (dueDate !== undefined) updateData.dueDate = dueDate;
+
+    if (completed !== undefined) {
+      updateData.completed = completed;
+      updateData.completedAt = completed ? new Date() : null;
+    }
+
+    const task = await Task.findByIdAndUpdate(req.params.id, updateData, {
+      new: true,
+    });
 
     if (!task) {
       return res.status(404).json({ error: "Task not found" });
@@ -312,8 +326,6 @@ app.delete("/api/tasks/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to delete task" });
   }
 });
-
-// Routes
 
 // Authentication
 app.post("/api/authenticate", (req, res) => {
