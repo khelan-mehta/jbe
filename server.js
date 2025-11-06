@@ -215,6 +215,104 @@ RESOURCES REQUIREMENTS (CRITICAL):
   }
 }
 
+// Task Schema
+const taskSchema = new mongoose.Schema({
+  text: {
+    type: String,
+    required: true,
+  },
+  completed: {
+    type: Boolean,
+    default: false,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+  completedAt: {
+    type: Date,
+    default: null,
+  },
+});
+
+const Task = mongoose.model("Task", taskSchema);
+
+// Task Routes
+
+// Get all tasks
+app.get("/api/tasks", async (req, res) => {
+  try {
+    const tasks = await Task.find().sort({ createdAt: -1 });
+    res.json(tasks);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch tasks" });
+  }
+});
+
+// Create new task
+app.post("/api/tasks", async (req, res) => {
+  try {
+    const { text } = req.body;
+
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: "Task text is required" });
+    }
+
+    const task = new Task({
+      text: text.trim(),
+      completed: false,
+      createdAt: new Date(),
+    });
+
+    await task.save();
+    res.status(201).json(task);
+  } catch (error) {
+    console.error("Error creating task:", error);
+    res.status(500).json({ error: "Failed to create task" });
+  }
+});
+
+// Update task (toggle completion)
+app.put("/api/tasks/:id", async (req, res) => {
+  try {
+    const { completed } = req.body;
+
+    const task = await Task.findByIdAndUpdate(
+      req.params.id,
+      {
+        completed,
+        completedAt: completed ? new Date() : null,
+      },
+      { new: true }
+    );
+
+    if (!task) {
+      return res.status(404).json({ error: "Task not found" });
+    }
+
+    res.json(task);
+  } catch (error) {
+    console.error("Error updating task:", error);
+    res.status(500).json({ error: "Failed to update task" });
+  }
+});
+
+// Delete task
+app.delete("/api/tasks/:id", async (req, res) => {
+  try {
+    const task = await Task.findByIdAndDelete(req.params.id);
+
+    if (!task) {
+      return res.status(404).json({ error: "Task not found" });
+    }
+
+    res.json({ message: "Task deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting task:", error);
+    res.status(500).json({ error: "Failed to delete task" });
+  }
+});
+
 // Routes
 
 // Authentication
