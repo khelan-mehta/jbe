@@ -429,6 +429,442 @@ app.delete("/api/entries/:id", async (req, res) => {
   }
 });
 
+// Add these schemas after the Task schema in your backend
+
+// Learning Topic Schema
+const learningTopicSchema = new mongoose.Schema({
+  dayNumber: {
+    type: Number,
+    required: true,
+    unique: true,
+    min: 1,
+    max: 30,
+  },
+  title: {
+    type: String,
+    required: true,
+  },
+  category: {
+    type: String,
+    enum: ['scalability', 'database', 'caching', 'messaging', 'networking', 'security', 'architecture'],
+    default: 'architecture',
+  },
+  completed: {
+    type: Boolean,
+    default: false,
+  },
+  completedAt: {
+    type: Date,
+    default: null,
+  },
+  content: {
+    overview: { type: String, default: '' },
+    keyComponents: { type: Array, default: [] },
+    implementation: { type: String, default: '' },
+    realWorldExamples: { type: Array, default: [] },
+    codeExample: { type: String, default: '' },
+    bestPractices: { type: Array, default: [] },
+    commonPitfalls: { type: Array, default: [] },
+    resources: { type: Array, default: [] },
+  },
+  notes: {
+    type: String,
+    default: '',
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
+const LearningTopic = mongoose.model('LearningTopic', learningTopicSchema);
+
+// 30-day System Design Roadmap
+const SYSTEM_DESIGN_ROADMAP = [
+  { day: 1, title: 'Load Balancing Fundamentals', category: 'scalability' },
+  { day: 2, title: 'Horizontal vs Vertical Scaling', category: 'scalability' },
+  { day: 3, title: 'Database Sharding', category: 'database' },
+  { day: 4, title: 'Database Replication & Master-Slave Architecture', category: 'database' },
+  { day: 5, title: 'Caching Strategies (Redis, Memcached)', category: 'caching' },
+  { day: 6, title: 'Content Delivery Networks (CDN)', category: 'networking' },
+  { day: 7, title: 'Message Queues (RabbitMQ, Kafka)', category: 'messaging' },
+  { day: 8, title: 'Microservices Architecture', category: 'architecture' },
+  { day: 9, title: 'API Gateway Patterns', category: 'architecture' },
+  { day: 10, title: 'Database Indexing & Query Optimization', category: 'database' },
+  { day: 11, title: 'CAP Theorem & Distributed Systems', category: 'architecture' },
+  { day: 12, title: 'Event-Driven Architecture', category: 'architecture' },
+  { day: 13, title: 'Rate Limiting & Throttling', category: 'scalability' },
+  { day: 14, title: 'Consistent Hashing', category: 'architecture' },
+  { day: 15, title: 'Database Partitioning Strategies', category: 'database' },
+  { day: 16, title: 'NoSQL Databases (MongoDB, Cassandra, DynamoDB)', category: 'database' },
+  { day: 17, title: 'WebSockets & Real-Time Communication', category: 'networking' },
+  { day: 18, title: 'Authentication & Authorization (OAuth, JWT)', category: 'security' },
+  { day: 19, title: 'Service Discovery & Health Checks', category: 'architecture' },
+  { day: 20, title: 'Circuit Breaker Pattern', category: 'architecture' },
+  { day: 21, title: 'Data Warehousing & OLAP vs OLTP', category: 'database' },
+  { day: 22, title: 'Search Systems (Elasticsearch, Lucene)', category: 'database' },
+  { day: 23, title: 'Distributed Transactions & Two-Phase Commit', category: 'database' },
+  { day: 24, title: 'Blob Storage & Object Storage (S3)', category: 'database' },
+  { day: 25, title: 'Monitoring & Observability (Prometheus, Grafana)', category: 'architecture' },
+  { day: 26, title: 'Containerization & Orchestration (Docker, Kubernetes)', category: 'architecture' },
+  { day: 27, title: 'Stream Processing (Kafka Streams, Flink)', category: 'messaging' },
+  { day: 28, title: 'GraphQL vs REST Architecture', category: 'architecture' },
+  { day: 29, title: 'Disaster Recovery & Backup Strategies', category: 'architecture' },
+  { day: 30, title: 'System Design Case Study: Design Twitter/Instagram', category: 'architecture' },
+];
+
+// Function to generate comprehensive learning content using OpenAI
+async function generateLearningContent(topic, attempt = 1) {
+  const maxAttempts = 3;
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert system design instructor with deep knowledge of distributed systems, scalability, and software architecture. Create comprehensive, production-ready learning materials for software engineers.
+
+CRITICAL: Respond with ONLY valid JSON. No other text before or after. Follow this EXACT structure:
+
+{
+  "overview": "A detailed 4-5 paragraph explanation covering: what this concept is, why it's important, when to use it, and its place in modern system architecture. Be thorough and technical.",
+  "keyComponents": [
+    "Component 1: Brief description of its role",
+    "Component 2: Brief description of its role",
+    "Component 3: Brief description of its role"
+  ],
+  "implementation": "A detailed 5-6 paragraph technical deep-dive into HOW this is implemented. Include: architecture diagrams in text form, data flow, specific technologies/tools used, configuration examples, and step-by-step implementation approach. Be extremely detailed and practical.",
+  "realWorldExamples": [
+    {
+      "company": "Company Name",
+      "implementation": "2-3 sentences describing their specific implementation, scale, and results. Include numbers/metrics when possible.",
+      "techniqueUsed": "Specific technique or variation they used"
+    },
+    {
+      "company": "Another Company",
+      "implementation": "2-3 sentences with concrete details about their approach",
+      "techniqueUsed": "Their specific implementation details"
+    },
+    {
+      "company": "Third Company",
+      "implementation": "Real-world details of their system",
+      "techniqueUsed": "Technology stack and approach"
+    }
+  ],
+  "codeExample": "A complete, production-quality code example (150-300 lines) that demonstrates the concept. Include:\n- Language: Node.js/Python/Java (choose most appropriate)\n- Full working implementation with error handling\n- Detailed comments explaining each section\n- Configuration and setup code\n- Example usage\n- Testing considerations\nMake it realistic and runnable.",
+  "bestPractices": [
+    "Best practice 1: Detailed explanation of why this matters and how to implement it",
+    "Best practice 2: Technical guidance with specific recommendations",
+    "Best practice 3: Production considerations and optimization tips",
+    "Best practice 4: Security/performance/scalability consideration",
+    "Best practice 5: Monitoring and maintenance guidance"
+  ],
+  "commonPitfalls": [
+    "Pitfall 1: Description of the mistake and how to avoid it with technical details",
+    "Pitfall 2: Common anti-pattern and the correct approach",
+    "Pitfall 3: Performance/scalability issue and solution",
+    "Pitfall 4: Security vulnerability and mitigation"
+  ],
+  "resources": [
+    {
+      "title": "Technical paper/documentation title",
+      "url": "https://real-url.com",
+      "type": "Paper/Documentation/Tutorial"
+    },
+    {
+      "title": "Another resource title",
+      "url": "https://real-url.com",
+      "type": "Blog/Video/Course"
+    },
+    {
+      "title": "Third resource",
+      "url": "https://real-url.com",
+      "type": "Resource type"
+    }
+  ]
+}
+
+Guidelines:
+- Be extremely detailed and technical
+- Include real metrics, numbers, and scale information
+- Provide production-ready code, not toy examples
+- Reference specific technologies and tools
+- Include concrete implementation steps
+- Make it comprehensive enough for someone to actually implement this
+- Focus on practical, real-world applications
+- NO explanatory text outside the JSON structure`,
+        },
+        {
+          role: "user",
+          content: `Create comprehensive learning material for: "${topic.title}". This is Day ${topic.dayNumber} of a 30-day system design course. Make it extremely detailed, practical, and production-ready. Include real-world examples from major tech companies, complete code implementations, and actionable guidance. Respond with ONLY the JSON structure.`,
+        },
+      ],
+      max_tokens: 4000,
+      temperature: 0.7,
+    });
+
+    const responseText = completion.choices[0].message.content.trim();
+
+    // Try to extract JSON if there's extra text
+    let jsonText = responseText;
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      jsonText = jsonMatch[0];
+    }
+
+    const result = JSON.parse(jsonText);
+
+    // Validate the structure
+    if (!result.overview || typeof result.overview !== 'string') {
+      throw new Error('Invalid overview');
+    }
+    if (!result.implementation || typeof result.implementation !== 'string') {
+      throw new Error('Invalid implementation');
+    }
+    if (!result.codeExample || typeof result.codeExample !== 'string') {
+      throw new Error('Invalid code example');
+    }
+    if (!Array.isArray(result.keyComponents) || result.keyComponents.length === 0) {
+      throw new Error('Invalid key components');
+    }
+    if (!Array.isArray(result.realWorldExamples) || result.realWorldExamples.length === 0) {
+      throw new Error('Invalid real world examples');
+    }
+    if (!Array.isArray(result.bestPractices) || result.bestPractices.length === 0) {
+      throw new Error('Invalid best practices');
+    }
+    if (!Array.isArray(result.commonPitfalls) || result.commonPitfalls.length === 0) {
+      throw new Error('Invalid common pitfalls');
+    }
+    if (!Array.isArray(result.resources)) {
+      throw new Error('Invalid resources');
+    }
+
+    return result;
+  } catch (error) {
+    console.error(`OpenAI API Error (Attempt ${attempt}/${maxAttempts}):`, error.message);
+
+    if (attempt < maxAttempts) {
+      console.log(`Retrying... (Attempt ${attempt + 1}/${maxAttempts})`);
+      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+      return generateLearningContent(topic, attempt + 1);
+    }
+
+    // After 3 failed attempts, return error response
+    console.error(`Failed to generate learning content after ${maxAttempts} attempts`);
+    return {
+      overview: `Failed to generate content after ${maxAttempts} attempts. Please try again later.`,
+      keyComponents: [],
+      implementation: 'Content generation failed. Please retry.',
+      realWorldExamples: [],
+      codeExample: '// Content generation failed',
+      bestPractices: [],
+      commonPitfalls: [],
+      resources: [],
+    };
+  }
+}
+
+// Learning Routes
+
+// Initialize roadmap (call this once to populate the database)
+app.post("/api/learning/initialize", async (req, res) => {
+  try {
+    // Check if already initialized
+    const existingTopics = await LearningTopic.countDocuments();
+    if (existingTopics > 0) {
+      return res.status(400).json({ error: "Roadmap already initialized" });
+    }
+
+    // Create all 30 topics
+    const topics = SYSTEM_DESIGN_ROADMAP.map(item => ({
+      dayNumber: item.day,
+      title: item.title,
+      category: item.category,
+      completed: false,
+      content: {
+        overview: '',
+        keyComponents: [],
+        implementation: '',
+        realWorldExamples: [],
+        codeExample: '',
+        bestPractices: [],
+        commonPitfalls: [],
+        resources: [],
+      },
+    }));
+
+    await LearningTopic.insertMany(topics);
+    res.status(201).json({ message: "Roadmap initialized successfully", count: topics.length });
+  } catch (error) {
+    console.error("Error initializing roadmap:", error);
+    res.status(500).json({ error: "Failed to initialize roadmap" });
+  }
+});
+
+// Get all learning topics (roadmap overview)
+app.get("/api/learning/roadmap", async (req, res) => {
+  try {
+    const topics = await LearningTopic.find().sort({ dayNumber: 1 });
+    res.json(topics);
+  } catch (error) {
+    console.error("Error fetching roadmap:", error);
+    res.status(500).json({ error: "Failed to fetch roadmap" });
+  }
+});
+
+// Get specific topic details
+app.get("/api/learning/topic/:dayNumber", async (req, res) => {
+  try {
+    const topic = await LearningTopic.findOne({ dayNumber: parseInt(req.params.dayNumber) });
+    
+    if (!topic) {
+      return res.status(404).json({ error: "Topic not found" });
+    }
+
+    res.json(topic);
+  } catch (error) {
+    console.error("Error fetching topic:", error);
+    res.status(500).json({ error: "Failed to fetch topic" });
+  }
+});
+
+// Generate content for a specific topic (this calls OpenAI)
+app.post("/api/learning/generate/:dayNumber", async (req, res) => {
+  try {
+    const topic = await LearningTopic.findOne({ dayNumber: parseInt(req.params.dayNumber) });
+    
+    if (!topic) {
+      return res.status(404).json({ error: "Topic not found" });
+    }
+
+    // Check if content already exists
+    if (topic.content.overview && topic.content.overview.length > 100) {
+      return res.status(400).json({ 
+        error: "Content already generated for this topic",
+        message: "Use the update endpoint to regenerate"
+      });
+    }
+
+    console.log(`Generating content for Day ${topic.dayNumber}: ${topic.title}`);
+    
+    const generatedContent = await generateLearningContent(topic);
+
+    topic.content = generatedContent;
+    await topic.save();
+
+    res.json(topic);
+  } catch (error) {
+    console.error("Error generating content:", error);
+    res.status(500).json({ error: "Failed to generate content" });
+  }
+});
+
+// Mark topic as completed
+app.put("/api/learning/complete/:dayNumber", async (req, res) => {
+  try {
+    const { completed, notes } = req.body;
+    
+    const topic = await LearningTopic.findOneAndUpdate(
+      { dayNumber: parseInt(req.params.dayNumber) },
+      {
+        completed: completed !== undefined ? completed : true,
+        completedAt: completed ? new Date() : null,
+        ...(notes !== undefined && { notes }),
+      },
+      { new: true }
+    );
+
+    if (!topic) {
+      return res.status(404).json({ error: "Topic not found" });
+    }
+
+    res.json(topic);
+  } catch (error) {
+    console.error("Error updating topic:", error);
+    res.status(500).json({ error: "Failed to update topic" });
+  }
+});
+
+// Update topic notes
+app.put("/api/learning/notes/:dayNumber", async (req, res) => {
+  try {
+    const { notes } = req.body;
+    
+    const topic = await LearningTopic.findOneAndUpdate(
+      { dayNumber: parseInt(req.params.dayNumber) },
+      { notes },
+      { new: true }
+    );
+
+    if (!topic) {
+      return res.status(404).json({ error: "Topic not found" });
+    }
+
+    res.json(topic);
+  } catch (error) {
+    console.error("Error updating notes:", error);
+    res.status(500).json({ error: "Failed to update notes" });
+  }
+});
+
+// Get learning statistics
+app.get("/api/learning/stats", async (req, res) => {
+  try {
+    const total = await LearningTopic.countDocuments();
+    const completed = await LearningTopic.countDocuments({ completed: true });
+    const inProgress = total - completed;
+    
+    const categoryCounts = await LearningTopic.aggregate([
+      {
+        $group: {
+          _id: "$category",
+          total: { $sum: 1 },
+          completed: {
+            $sum: { $cond: [{ $eq: ["$completed", true] }, 1, 0] }
+          }
+        }
+      }
+    ]);
+
+    const recentlyCompleted = await LearningTopic.find({ completed: true })
+      .sort({ completedAt: -1 })
+      .limit(5);
+
+    res.json({
+      total,
+      completed,
+      inProgress,
+      percentage: Math.round((completed / total) * 100),
+      byCategory: categoryCounts,
+      recentlyCompleted,
+    });
+  } catch (error) {
+    console.error("Error fetching stats:", error);
+    res.status(500).json({ error: "Failed to fetch statistics" });
+  }
+});
+
+// Reset all progress (use with caution)
+app.post("/api/learning/reset", async (req, res) => {
+  try {
+    await LearningTopic.updateMany(
+      {},
+      { 
+        completed: false, 
+        completedAt: null,
+        notes: '',
+      }
+    );
+    
+    res.json({ message: "All progress reset successfully" });
+  } catch (error) {
+    console.error("Error resetting progress:", error);
+    res.status(500).json({ error: "Failed to reset progress" });
+  }
+});
+
 // Health check
 app.get("/api/health", (req, res) => {
   res.json({ status: "OK", message: "Server is running" });
