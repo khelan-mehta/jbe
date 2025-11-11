@@ -25,6 +25,64 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "",
 });
 
+const NodeCache = require("node-cache");
+
+// Initialize cache with 1 hour TTL (time to live)
+const cache = new NodeCache({
+  stdTTL: 3600, // 1 hour in seconds
+  checkperiod: 120, // Check for expired keys every 2 minutes
+  useClones: false, // Don't clone objects for better performance
+});
+
+// Cache keys constants
+const CACHE_KEYS = {
+  ROADMAP: "roadmap_all",
+  STATS: "learning_stats",
+  TOPIC: (dayNumber) => `topic_${dayNumber}`,
+  GENERATED_CONTENT: (dayNumber) => `generated_${dayNumber}`,
+};
+
+// Middleware to check cache
+const cacheMiddleware = (keyGenerator, ttl = 3600) => {
+  return (req, res, next) => {
+    const key =
+      typeof keyGenerator === "function" ? keyGenerator(req) : keyGenerator;
+
+    const cachedData = cache.get(key);
+
+    if (cachedData) {
+      console.log(`✅ Cache HIT for key: ${key}`);
+      return res.json(cachedData);
+    }
+
+    console.log(`❌ Cache MISS for key: ${key}`);
+
+    // Store the original json method
+    res.originalJson = res.json;
+
+    // Override json method to cache the response
+    res.json = function (data) {
+      cache.set(key, data, ttl);
+      console.log(`💾 Cached data for key: ${key}`);
+      return res.originalJson(data);
+    };
+
+    next();
+  };
+};
+
+// Helper function to invalidate related caches
+const invalidateCache = (patterns) => {
+  const keys = cache.keys();
+  patterns.forEach((pattern) => {
+    const matchedKeys = keys.filter((key) => key.includes(pattern));
+    matchedKeys.forEach((key) => {
+      cache.del(key);
+      console.log(`🗑️  Invalidated cache: ${key}`);
+    });
+  });
+};
+
 // Entry Schema
 const entrySchema = new mongoose.Schema({
   date: {
@@ -446,8 +504,16 @@ const learningTopicSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    enum: ['scalability', 'database', 'caching', 'messaging', 'networking', 'security', 'architecture'],
-    default: 'architecture',
+    enum: [
+      "scalability",
+      "database",
+      "caching",
+      "messaging",
+      "networking",
+      "security",
+      "architecture",
+    ],
+    default: "architecture",
   },
   completed: {
     type: Boolean,
@@ -458,18 +524,18 @@ const learningTopicSchema = new mongoose.Schema({
     default: null,
   },
   content: {
-    overview: { type: String, default: '' },
+    overview: { type: String, default: "" },
     keyComponents: { type: Array, default: [] },
-    implementation: { type: String, default: '' },
+    implementation: { type: String, default: "" },
     realWorldExamples: { type: Array, default: [] },
-    codeExample: { type: String, default: '' },
+    codeExample: { type: String, default: "" },
     bestPractices: { type: Array, default: [] },
     commonPitfalls: { type: Array, default: [] },
     resources: { type: Array, default: [] },
   },
   notes: {
     type: String,
-    default: '',
+    default: "",
   },
   createdAt: {
     type: Date,
@@ -477,40 +543,104 @@ const learningTopicSchema = new mongoose.Schema({
   },
 });
 
-const LearningTopic = mongoose.model('LearningTopic', learningTopicSchema);
+const LearningTopic = mongoose.model("LearningTopic", learningTopicSchema);
 
 // 30-day System Design Roadmap
 const SYSTEM_DESIGN_ROADMAP = [
-  { day: 1, title: 'Load Balancing Fundamentals', category: 'scalability' },
-  { day: 2, title: 'Horizontal vs Vertical Scaling', category: 'scalability' },
-  { day: 3, title: 'Database Sharding', category: 'database' },
-  { day: 4, title: 'Database Replication & Master-Slave Architecture', category: 'database' },
-  { day: 5, title: 'Caching Strategies (Redis, Memcached)', category: 'caching' },
-  { day: 6, title: 'Content Delivery Networks (CDN)', category: 'networking' },
-  { day: 7, title: 'Message Queues (RabbitMQ, Kafka)', category: 'messaging' },
-  { day: 8, title: 'Microservices Architecture', category: 'architecture' },
-  { day: 9, title: 'API Gateway Patterns', category: 'architecture' },
-  { day: 10, title: 'Database Indexing & Query Optimization', category: 'database' },
-  { day: 11, title: 'CAP Theorem & Distributed Systems', category: 'architecture' },
-  { day: 12, title: 'Event-Driven Architecture', category: 'architecture' },
-  { day: 13, title: 'Rate Limiting & Throttling', category: 'scalability' },
-  { day: 14, title: 'Consistent Hashing', category: 'architecture' },
-  { day: 15, title: 'Database Partitioning Strategies', category: 'database' },
-  { day: 16, title: 'NoSQL Databases (MongoDB, Cassandra, DynamoDB)', category: 'database' },
-  { day: 17, title: 'WebSockets & Real-Time Communication', category: 'networking' },
-  { day: 18, title: 'Authentication & Authorization (OAuth, JWT)', category: 'security' },
-  { day: 19, title: 'Service Discovery & Health Checks', category: 'architecture' },
-  { day: 20, title: 'Circuit Breaker Pattern', category: 'architecture' },
-  { day: 21, title: 'Data Warehousing & OLAP vs OLTP', category: 'database' },
-  { day: 22, title: 'Search Systems (Elasticsearch, Lucene)', category: 'database' },
-  { day: 23, title: 'Distributed Transactions & Two-Phase Commit', category: 'database' },
-  { day: 24, title: 'Blob Storage & Object Storage (S3)', category: 'database' },
-  { day: 25, title: 'Monitoring & Observability (Prometheus, Grafana)', category: 'architecture' },
-  { day: 26, title: 'Containerization & Orchestration (Docker, Kubernetes)', category: 'architecture' },
-  { day: 27, title: 'Stream Processing (Kafka Streams, Flink)', category: 'messaging' },
-  { day: 28, title: 'GraphQL vs REST Architecture', category: 'architecture' },
-  { day: 29, title: 'Disaster Recovery & Backup Strategies', category: 'architecture' },
-  { day: 30, title: 'System Design Case Study: Design Twitter/Instagram', category: 'architecture' },
+  { day: 1, title: "Load Balancing Fundamentals", category: "scalability" },
+  { day: 2, title: "Horizontal vs Vertical Scaling", category: "scalability" },
+  { day: 3, title: "Database Sharding", category: "database" },
+  {
+    day: 4,
+    title: "Database Replication & Master-Slave Architecture",
+    category: "database",
+  },
+  {
+    day: 5,
+    title: "Caching Strategies (Redis, Memcached)",
+    category: "caching",
+  },
+  { day: 6, title: "Content Delivery Networks (CDN)", category: "networking" },
+  { day: 7, title: "Message Queues (RabbitMQ, Kafka)", category: "messaging" },
+  { day: 8, title: "Microservices Architecture", category: "architecture" },
+  { day: 9, title: "API Gateway Patterns", category: "architecture" },
+  {
+    day: 10,
+    title: "Database Indexing & Query Optimization",
+    category: "database",
+  },
+  {
+    day: 11,
+    title: "CAP Theorem & Distributed Systems",
+    category: "architecture",
+  },
+  { day: 12, title: "Event-Driven Architecture", category: "architecture" },
+  { day: 13, title: "Rate Limiting & Throttling", category: "scalability" },
+  { day: 14, title: "Consistent Hashing", category: "architecture" },
+  { day: 15, title: "Database Partitioning Strategies", category: "database" },
+  {
+    day: 16,
+    title: "NoSQL Databases (MongoDB, Cassandra, DynamoDB)",
+    category: "database",
+  },
+  {
+    day: 17,
+    title: "WebSockets & Real-Time Communication",
+    category: "networking",
+  },
+  {
+    day: 18,
+    title: "Authentication & Authorization (OAuth, JWT)",
+    category: "security",
+  },
+  {
+    day: 19,
+    title: "Service Discovery & Health Checks",
+    category: "architecture",
+  },
+  { day: 20, title: "Circuit Breaker Pattern", category: "architecture" },
+  { day: 21, title: "Data Warehousing & OLAP vs OLTP", category: "database" },
+  {
+    day: 22,
+    title: "Search Systems (Elasticsearch, Lucene)",
+    category: "database",
+  },
+  {
+    day: 23,
+    title: "Distributed Transactions & Two-Phase Commit",
+    category: "database",
+  },
+  {
+    day: 24,
+    title: "Blob Storage & Object Storage (S3)",
+    category: "database",
+  },
+  {
+    day: 25,
+    title: "Monitoring & Observability (Prometheus, Grafana)",
+    category: "architecture",
+  },
+  {
+    day: 26,
+    title: "Containerization & Orchestration (Docker, Kubernetes)",
+    category: "architecture",
+  },
+  {
+    day: 27,
+    title: "Stream Processing (Kafka Streams, Flink)",
+    category: "messaging",
+  },
+  { day: 28, title: "GraphQL vs REST Architecture", category: "architecture" },
+  {
+    day: 29,
+    title: "Disaster Recovery & Backup Strategies",
+    category: "architecture",
+  },
+  {
+    day: 30,
+    title: "System Design Case Study: Design Twitter/Instagram",
+    category: "architecture",
+  },
 ];
 
 // Function to generate comprehensive learning content using OpenAI
@@ -616,34 +746,49 @@ Guidelines:
     const result = JSON.parse(jsonText);
 
     // Validate the structure
-    if (!result.overview || typeof result.overview !== 'string') {
-      throw new Error('Invalid overview');
+    if (!result.overview || typeof result.overview !== "string") {
+      throw new Error("Invalid overview");
     }
-    if (!result.implementation || typeof result.implementation !== 'string') {
-      throw new Error('Invalid implementation');
+    if (!result.implementation || typeof result.implementation !== "string") {
+      throw new Error("Invalid implementation");
     }
-    if (!result.codeExample || typeof result.codeExample !== 'string') {
-      throw new Error('Invalid code example');
+    if (!result.codeExample || typeof result.codeExample !== "string") {
+      throw new Error("Invalid code example");
     }
-    if (!Array.isArray(result.keyComponents) || result.keyComponents.length === 0) {
-      throw new Error('Invalid key components');
+    if (
+      !Array.isArray(result.keyComponents) ||
+      result.keyComponents.length === 0
+    ) {
+      throw new Error("Invalid key components");
     }
-    if (!Array.isArray(result.realWorldExamples) || result.realWorldExamples.length === 0) {
-      throw new Error('Invalid real world examples');
+    if (
+      !Array.isArray(result.realWorldExamples) ||
+      result.realWorldExamples.length === 0
+    ) {
+      throw new Error("Invalid real world examples");
     }
-    if (!Array.isArray(result.bestPractices) || result.bestPractices.length === 0) {
-      throw new Error('Invalid best practices');
+    if (
+      !Array.isArray(result.bestPractices) ||
+      result.bestPractices.length === 0
+    ) {
+      throw new Error("Invalid best practices");
     }
-    if (!Array.isArray(result.commonPitfalls) || result.commonPitfalls.length === 0) {
-      throw new Error('Invalid common pitfalls');
+    if (
+      !Array.isArray(result.commonPitfalls) ||
+      result.commonPitfalls.length === 0
+    ) {
+      throw new Error("Invalid common pitfalls");
     }
     if (!Array.isArray(result.resources)) {
-      throw new Error('Invalid resources');
+      throw new Error("Invalid resources");
     }
 
     return result;
   } catch (error) {
-    console.error(`OpenAI API Error (Attempt ${attempt}/${maxAttempts}):`, error.message);
+    console.error(
+      `OpenAI API Error (Attempt ${attempt}/${maxAttempts}):`,
+      error.message
+    );
 
     if (attempt < maxAttempts) {
       console.log(`Retrying... (Attempt ${attempt + 1}/${maxAttempts})`);
@@ -652,13 +797,15 @@ Guidelines:
     }
 
     // After 3 failed attempts, return error response
-    console.error(`Failed to generate learning content after ${maxAttempts} attempts`);
+    console.error(
+      `Failed to generate learning content after ${maxAttempts} attempts`
+    );
     return {
       overview: `Failed to generate content after ${maxAttempts} attempts. Please try again later.`,
       keyComponents: [],
-      implementation: 'Content generation failed. Please retry.',
+      implementation: "Content generation failed. Please retry.",
       realWorldExamples: [],
-      codeExample: '// Content generation failed',
+      codeExample: "// Content generation failed",
       bestPractices: [],
       commonPitfalls: [],
       resources: [],
@@ -678,17 +825,17 @@ app.post("/api/learning/initialize", async (req, res) => {
     }
 
     // Create all 30 topics
-    const topics = SYSTEM_DESIGN_ROADMAP.map(item => ({
+    const topics = SYSTEM_DESIGN_ROADMAP.map((item) => ({
       dayNumber: item.day,
       title: item.title,
       category: item.category,
       completed: false,
       content: {
-        overview: '',
+        overview: "",
         keyComponents: [],
-        implementation: '',
+        implementation: "",
         realWorldExamples: [],
-        codeExample: '',
+        codeExample: "",
         bestPractices: [],
         commonPitfalls: [],
         resources: [],
@@ -696,63 +843,128 @@ app.post("/api/learning/initialize", async (req, res) => {
     }));
 
     await LearningTopic.insertMany(topics);
-    res.status(201).json({ message: "Roadmap initialized successfully", count: topics.length });
+    res
+      .status(201)
+      .json({
+        message: "Roadmap initialized successfully",
+        count: topics.length,
+      });
   } catch (error) {
     console.error("Error initializing roadmap:", error);
     res.status(500).json({ error: "Failed to initialize roadmap" });
   }
 });
 
-// Get all learning topics (roadmap overview)
-app.get("/api/learning/roadmap", async (req, res) => {
-  try {
-    const topics = await LearningTopic.find().sort({ dayNumber: 1 });
-    res.json(topics);
-  } catch (error) {
-    console.error("Error fetching roadmap:", error);
-    res.status(500).json({ error: "Failed to fetch roadmap" });
-  }
-});
-
-// Get specific topic details
-app.get("/api/learning/topic/:dayNumber", async (req, res) => {
-  try {
-    const topic = await LearningTopic.findOne({ dayNumber: parseInt(req.params.dayNumber) });
-    
-    if (!topic) {
-      return res.status(404).json({ error: "Topic not found" });
+app.get(
+  "/api/learning/roadmap",
+  cacheMiddleware(CACHE_KEYS.ROADMAP, 3600), // Cache for 1 hour
+  async (req, res) => {
+    try {
+      const topics = await LearningTopic.find().sort({ dayNumber: 1 });
+      res.json(topics);
+    } catch (error) {
+      console.error("Error fetching roadmap:", error);
+      res.status(500).json({ error: "Failed to fetch roadmap" });
     }
-
-    res.json(topic);
-  } catch (error) {
-    console.error("Error fetching topic:", error);
-    res.status(500).json({ error: "Failed to fetch topic" });
   }
-});
+);
 
-// Generate content for a specific topic (this calls OpenAI)
+// Get specific topic details - WITH CACHE
+app.get(
+  "/api/learning/topic/:dayNumber",
+  cacheMiddleware((req) => CACHE_KEYS.TOPIC(req.params.dayNumber), 3600),
+  async (req, res) => {
+    try {
+      const topic = await LearningTopic.findOne({
+        dayNumber: parseInt(req.params.dayNumber),
+      });
+
+      if (!topic) {
+        return res.status(404).json({ error: "Topic not found" });
+      }
+
+      res.json(topic);
+    } catch (error) {
+      console.error("Error fetching topic:", error);
+      res.status(500).json({ error: "Failed to fetch topic" });
+    }
+  }
+);
+
+// Get learning statistics - WITH CACHE
+app.get(
+  "/api/learning/stats",
+  cacheMiddleware(CACHE_KEYS.STATS, 300), // Cache for 5 minutes
+  async (req, res) => {
+    try {
+      const total = await LearningTopic.countDocuments();
+      const completed = await LearningTopic.countDocuments({ completed: true });
+      const inProgress = total - completed;
+
+      const categoryCounts = await LearningTopic.aggregate([
+        {
+          $group: {
+            _id: "$category",
+            total: { $sum: 1 },
+            completed: {
+              $sum: { $cond: [{ $eq: ["$completed", true] }, 1, 0] },
+            },
+          },
+        },
+      ]);
+
+      const recentlyCompleted = await LearningTopic.find({ completed: true })
+        .sort({ completedAt: -1 })
+        .limit(5);
+
+      res.json({
+        total,
+        completed,
+        inProgress,
+        percentage: Math.round((completed / total) * 100),
+        byCategory: categoryCounts,
+        recentlyCompleted,
+      });
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+      res.status(500).json({ error: "Failed to fetch statistics" });
+    }
+  }
+);
+
+// Generate content - INVALIDATE CACHE AFTER
 app.post("/api/learning/generate/:dayNumber", async (req, res) => {
   try {
-    const topic = await LearningTopic.findOne({ dayNumber: parseInt(req.params.dayNumber) });
-    
+    const dayNumber = parseInt(req.params.dayNumber);
+    const topic = await LearningTopic.findOne({ dayNumber });
+
     if (!topic) {
       return res.status(404).json({ error: "Topic not found" });
     }
 
     // Check if content already exists
     if (topic.content.overview && topic.content.overview.length > 100) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: "Content already generated for this topic",
-        message: "Use the update endpoint to regenerate"
+        message: "Use the update endpoint to regenerate",
       });
     }
 
-    console.log(`Generating content for Day ${topic.dayNumber}: ${topic.title}`);
-    
+    console.log(
+      `Generating content for Day ${topic.dayNumber}: ${topic.title}`
+    );
+
     const generatedContent = await generateLearningContent(topic);
 
     topic.content = generatedContent;
     await topic.save();
+
+    // Invalidate related caches
+    invalidateCache([
+      CACHE_KEYS.TOPIC(dayNumber),
+      CACHE_KEYS.ROADMAP,
+      CACHE_KEYS.STATS,
+    ]);
 
     res.json(topic);
   } catch (error) {
@@ -761,13 +973,14 @@ app.post("/api/learning/generate/:dayNumber", async (req, res) => {
   }
 });
 
-// Mark topic as completed
+// Mark topic as completed - INVALIDATE CACHE AFTER
 app.put("/api/learning/complete/:dayNumber", async (req, res) => {
   try {
     const { completed, notes } = req.body;
-    
+    const dayNumber = parseInt(req.params.dayNumber);
+
     const topic = await LearningTopic.findOneAndUpdate(
-      { dayNumber: parseInt(req.params.dayNumber) },
+      { dayNumber },
       {
         completed: completed !== undefined ? completed : true,
         completedAt: completed ? new Date() : null,
@@ -780,6 +993,13 @@ app.put("/api/learning/complete/:dayNumber", async (req, res) => {
       return res.status(404).json({ error: "Topic not found" });
     }
 
+    // Invalidate related caches
+    invalidateCache([
+      CACHE_KEYS.TOPIC(dayNumber),
+      CACHE_KEYS.ROADMAP,
+      CACHE_KEYS.STATS,
+    ]);
+
     res.json(topic);
   } catch (error) {
     console.error("Error updating topic:", error);
@@ -787,13 +1007,14 @@ app.put("/api/learning/complete/:dayNumber", async (req, res) => {
   }
 });
 
-// Update topic notes
+// Update topic notes - INVALIDATE CACHE AFTER
 app.put("/api/learning/notes/:dayNumber", async (req, res) => {
   try {
     const { notes } = req.body;
-    
+    const dayNumber = parseInt(req.params.dayNumber);
+
     const topic = await LearningTopic.findOneAndUpdate(
-      { dayNumber: parseInt(req.params.dayNumber) },
+      { dayNumber },
       { notes },
       { new: true }
     );
@@ -802,6 +1023,9 @@ app.put("/api/learning/notes/:dayNumber", async (req, res) => {
       return res.status(404).json({ error: "Topic not found" });
     }
 
+    // Invalidate related caches
+    invalidateCache([CACHE_KEYS.TOPIC(dayNumber), CACHE_KEYS.ROADMAP]);
+
     res.json(topic);
   } catch (error) {
     console.error("Error updating notes:", error);
@@ -809,41 +1033,27 @@ app.put("/api/learning/notes/:dayNumber", async (req, res) => {
   }
 });
 
-// Get learning statistics
-app.get("/api/learning/stats", async (req, res) => {
-  try {
-    const total = await LearningTopic.countDocuments();
-    const completed = await LearningTopic.countDocuments({ completed: true });
-    const inProgress = total - completed;
-    
-    const categoryCounts = await LearningTopic.aggregate([
-      {
-        $group: {
-          _id: "$category",
-          total: { $sum: 1 },
-          completed: {
-            $sum: { $cond: [{ $eq: ["$completed", true] }, 1, 0] }
-          }
-        }
-      }
-    ]);
+// Cache management endpoints (optional - for debugging/admin)
+app.get("/api/cache/stats", (req, res) => {
+  const stats = cache.getStats();
+  res.json({
+    keys: cache.keys().length,
+    hits: stats.hits,
+    misses: stats.misses,
+    hitRate: stats.hits / (stats.hits + stats.misses) || 0,
+    keyList: cache.keys(),
+  });
+});
 
-    const recentlyCompleted = await LearningTopic.find({ completed: true })
-      .sort({ completedAt: -1 })
-      .limit(5);
+app.delete("/api/cache/clear", (req, res) => {
+  cache.flushAll();
+  res.json({ message: "Cache cleared successfully" });
+});
 
-    res.json({
-      total,
-      completed,
-      inProgress,
-      percentage: Math.round((completed / total) * 100),
-      byCategory: categoryCounts,
-      recentlyCompleted,
-    });
-  } catch (error) {
-    console.error("Error fetching stats:", error);
-    res.status(500).json({ error: "Failed to fetch statistics" });
-  }
+app.delete("/api/cache/clear/:pattern", (req, res) => {
+  const pattern = req.params.pattern;
+  invalidateCache([pattern]);
+  res.json({ message: `Cache cleared for pattern: ${pattern}` });
 });
 
 // Reset all progress (use with caution)
@@ -851,13 +1061,13 @@ app.post("/api/learning/reset", async (req, res) => {
   try {
     await LearningTopic.updateMany(
       {},
-      { 
-        completed: false, 
+      {
+        completed: false,
         completedAt: null,
-        notes: '',
+        notes: "",
       }
     );
-    
+
     res.json({ message: "All progress reset successfully" });
   } catch (error) {
     console.error("Error resetting progress:", error);
