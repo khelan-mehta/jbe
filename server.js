@@ -2,6 +2,9 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const OpenAI = require("openai");
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 require("dotenv").config();
 
 const app = express();
@@ -149,6 +152,69 @@ const taskSchema = new mongoose.Schema({
 });
 
 const Task = mongoose.model("Task", taskSchema);
+
+// Personal Memory Schema
+const personalMemorySchema = new mongoose.Schema({
+  date: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+  text: {
+    type: String,
+    default: "",
+  },
+  imageUrl: {
+    type: String,
+    default: null,
+  },
+  imageName: {
+    type: String,
+    default: null,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
+const PersonalMemory = mongoose.model("PersonalMemory", personalMemorySchema);
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = './uploads';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'memory-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: function (req, file, cb) {
+    const filetypes = /jpeg|jpg|png|gif|webp/;
+    const mimetype = filetypes.test(file.mimetype);
+    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+    if (mimetype && extname) {
+      return cb(null, true);
+    }
+    cb(new Error('Only image files are allowed!'));
+  }
+});
+
+// Serve uploaded images
+app.use('/uploads', express.static('uploads'));
 
 // Password
 const PASSWORD = "nalehK05@";
@@ -1072,6 +1138,117 @@ app.post("/api/learning/reset", async (req, res) => {
   } catch (error) {
     console.error("Error resetting progress:", error);
     res.status(500).json({ error: "Failed to reset progress" });
+  }
+});
+
+
+// Personal Memory Routes
+
+// Get all personal memories
+app.get("/api/personal-memories", async (req, res) => {
+  try {
+    const memories = await PersonalMemory.find().sort({ date: -1 });
+    res.json(memories);
+  } catch (error) {
+    console.error("Error fetching memories:", error);
+    res.status(500).json({ error: "Failed to fetch memories" });
+  }
+});
+
+// Create new personal memory
+app.post("/api/personal-memories", upload.single('image'), async (req, res) => {
+  try {
+    const { date, text } = req.body;
+
+    const existingMemory = await PersonalMemory.findOne({ date });
+    if (existingMemory) {
+      return res.status(400).json({ error: "Memory for this date already exists" });
+    }
+
+    const memoryData = {
+      date,
+      text: text || "",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    if (req.file) {
+      memoryData.imageUrl = `/uploads/${req.file.filename}`;
+      memoryData.imageName = req.file.filename;
+    }
+
+    const memory = new PersonalMemory(memoryData);
+    await memory.save();
+    res.status(201).json(memory);
+  } catch (error) {
+    console.error("Error creating memory:", error);
+    res.status(500).json({ error: "Failed to create memory" });
+  }
+});
+
+// Update personal memory
+app.put("/api/personal-memories/:id", upload.single('image'), async (req, res) => {
+  try {
+    const { text } = req.body;
+    const memory = await PersonalMemory.findById(req.params.id);
+
+    if (!memory) {
+      return res.status(404).json({ error: "Memory not found" });
+    }
+
+    const updateData = {
+      text: text !== undefined ? text : memory.text,
+      updatedAt: new Date(),
+    };
+
+    // Handle new image upload
+    if (req.file) {
+      // Delete old image if it exists
+      if (memory.imageName) {
+        const oldImagePath = path.join(__dirname, 'uploads', memory.imageName);
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath);
+        }
+      }
+      updateData.imageUrl = `/uploads/${req.file.filename}`;
+      updateData.imageName = req.file.filename;
+    }
+
+    const updatedMemory = await PersonalMemory.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true }
+    );
+
+    res.json(updatedMemory);
+  } catch (error) {
+    console.error("Error updating memory:", error);
+    res.status(500).json({ error: "Failed to update memory" });
+  }
+});
+
+// Delete personal memory
+app.delete("/api/personal-memories/:id", async (req, res) => {
+  try {
+    const memory = await PersonalMemory.findById(req.params.id);
+
+    if (!memory) {
+      return res.status(404).json({ error: "Memory not found" });
+    }
+
+    // Delete associated image file if it exists
+    if (memory.imageName) {
+      const imagePath = path.join(__dirname, 'uploads', memory.imageName);
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
+    }
+
+    await PersonalMemory.findByIdAndDelete(req.params.id);
+    res.json({ message: "Memory deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting memory:", error);
+    res.status(500).json({ error: "Failed to delete memory" });
   }
 });
 
