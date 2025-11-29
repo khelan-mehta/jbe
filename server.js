@@ -1382,6 +1382,148 @@ app.delete("/api/personal-memories/:id", async (req, res) => {
   }
 });
 
+// Add this after your other schemas (after PersonalMemory schema)
+
+// Music Entry Schema
+const musicEntrySchema = new mongoose.Schema({
+  date: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+  youtubeUrl: {
+    type: String,
+    required: true,
+  },
+  title: {
+    type: String,
+    default: "",
+  },
+  artist: {
+    type: String,
+    default: "",
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
+const MusicEntry = mongoose.model("MusicEntry", musicEntrySchema);
+
+// Add these routes after your Personal Memory routes
+
+// Get all music entries
+app.get("/api/music", async (req, res) => {
+  try {
+    const musicEntries = await MusicEntry.find().sort({ date: -1 });
+    res.json(musicEntries);
+  } catch (error) {
+    console.error("Error fetching music entries:", error);
+    res.status(500).json({ error: "Failed to fetch music entries" });
+  }
+});
+
+// Get music entry by date
+app.get("/api/music/date/:date", async (req, res) => {
+  try {
+    const musicEntry = await MusicEntry.findOne({ date: req.params.date });
+    
+    if (!musicEntry) {
+      return res.status(404).json({ error: "No music for this date" });
+    }
+    
+    res.json(musicEntry);
+  } catch (error) {
+    console.error("Error fetching music entry:", error);
+    res.status(500).json({ error: "Failed to fetch music entry" });
+  }
+});
+
+// Create new music entry
+app.post("/api/music", async (req, res) => {
+  try {
+    const { date, youtubeUrl, title, artist } = req.body;
+
+    if (!youtubeUrl) {
+      return res.status(400).json({ error: "YouTube URL is required" });
+    }
+
+    // Check if entry exists for this date
+    const existingEntry = await MusicEntry.findOne({ date });
+    if (existingEntry) {
+      return res.status(400).json({ 
+        error: "Music entry for this date already exists. Use PUT to update." 
+      });
+    }
+
+    const musicEntry = new MusicEntry({
+      date,
+      youtubeUrl,
+      title: title || "",
+      artist: artist || "",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await musicEntry.save();
+    res.status(201).json(musicEntry);
+  } catch (error) {
+    console.error("Error creating music entry:", error);
+    res.status(500).json({ error: "Failed to create music entry" });
+  }
+});
+
+// Update music entry
+app.put("/api/music/:id", async (req, res) => {
+  try {
+    const { youtubeUrl, title, artist } = req.body;
+
+    const updateData = {
+      updatedAt: new Date(),
+    };
+
+    if (youtubeUrl) updateData.youtubeUrl = youtubeUrl;
+    if (title !== undefined) updateData.title = title;
+    if (artist !== undefined) updateData.artist = artist;
+
+    const musicEntry = await MusicEntry.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true }
+    );
+
+    if (!musicEntry) {
+      return res.status(404).json({ error: "Music entry not found" });
+    }
+
+    res.json(musicEntry);
+  } catch (error) {
+    console.error("Error updating music entry:", error);
+    res.status(500).json({ error: "Failed to update music entry" });
+  }
+});
+
+// Delete music entry
+app.delete("/api/music/:id", async (req, res) => {
+  try {
+    const musicEntry = await MusicEntry.findByIdAndDelete(req.params.id);
+
+    if (!musicEntry) {
+      return res.status(404).json({ error: "Music entry not found" });
+    }
+
+    res.json({ message: "Music entry deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting music entry:", error);
+    res.status(500).json({ error: "Failed to delete music entry" });
+  }
+});
+
 // Health check
 app.get("/api/health", (req, res) => {
   res.json({ status: "OK", message: "Server is running" });
