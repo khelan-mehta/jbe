@@ -1524,6 +1524,115 @@ app.delete("/api/music/:id", async (req, res) => {
   }
 });
 
+// Chess Game Schema
+const chessGameSchema = new mongoose.Schema({
+  date: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+  moves: {
+    type: Array,
+    default: [], // each move: { from, to, piece, color, san }
+  },
+  winner: {
+    type: String, // 'white' | 'black' | 'draw' | null
+    default: null,
+  },
+  boardState: {
+    type: String, // FEN representation
+    default: "",
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
+const ChessGame = mongoose.model("ChessGame", chessGameSchema);
+
+
+app.get("/api/chess/date/:date", async (req, res) => {
+  try {
+    const game = await ChessGame.findOne({ date: req.params.date });
+
+    if (!game) return res.status(404).json({ error: "No chess game for this date" });
+
+    res.json(game);
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Failed to fetch chess game" });
+  }
+});
+
+app.post("/api/chess", async (req, res) => {
+  try {
+    const { date, boardState } = req.body;
+
+    const exists = await ChessGame.findOne({ date });
+    if (exists) return res.status(400).json({ error: "Game already exists for this date" });
+
+    const game = new ChessGame({
+      date,
+      boardState,
+      moves: [],
+    });
+
+    await game.save();
+    res.status(201).json(game);
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Failed to create chess game" });
+  }
+});
+
+app.post("/api/chess/move/:id", async (req, res) => {
+  try {
+    const { move, boardState, winner } = req.body;
+
+    const game = await ChessGame.findById(req.params.id);
+    if (!game) return res.status(404).json({ error: "Game not found" });
+
+    game.moves.push(move);
+    game.boardState = boardState;
+    game.updatedAt = new Date();
+    if (winner) game.winner = winner;
+
+    await game.save();
+
+    res.json(game);
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Failed to save move" });
+  }
+});
+
+app.post("/api/chess/undo/:id", async (req, res) => {
+  try {
+    const { boardState } = req.body;
+
+    const game = await ChessGame.findById(req.params.id);
+    if (!game) return res.status(404).json({ error: "Game not found" });
+
+    game.moves.pop();
+    game.boardState = boardState;
+    game.winner = null;
+    game.updatedAt = new Date();
+
+    await game.save();
+
+    res.json(game);
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Failed to undo move" });
+  }
+});
+
+
 // Health check
 app.get("/api/health", (req, res) => {
   res.json({ status: "OK", message: "Server is running" });
