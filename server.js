@@ -1163,8 +1163,6 @@ app.post("/api/learning/reset", async (req, res) => {
   }
 });
 
-
-
 // Personal Memory Routes
 
 // Get all personal memories
@@ -1182,11 +1180,11 @@ app.get("/api/personal-memories", async (req, res) => {
 app.get("/api/personal-memories/:id", async (req, res) => {
   try {
     const memory = await PersonalMemory.findById(req.params.id);
-    
+
     if (!memory) {
       return res.status(404).json({ error: "Memory not found" });
     }
-    
+
     res.json(memory);
   } catch (error) {
     console.error("Error fetching memory:", error);
@@ -1198,11 +1196,11 @@ app.get("/api/personal-memories/:id", async (req, res) => {
 app.get("/api/personal-memories/date/:date", async (req, res) => {
   try {
     const memory = await PersonalMemory.findOne({ date: req.params.date });
-    
+
     if (!memory) {
       return res.status(404).json({ error: "Memory not found for this date" });
     }
-    
+
     res.json(memory);
   } catch (error) {
     console.error("Error fetching memory:", error);
@@ -1211,33 +1209,36 @@ app.get("/api/personal-memories/date/:date", async (req, res) => {
 });
 
 // Get memories by date range
-app.get("/api/personal-memories/range/:startDate/:endDate", async (req, res) => {
-  try {
-    const { startDate, endDate } = req.params;
-    
-    const memories = await PersonalMemory.find({
-      date: {
-        $gte: startDate,
-        $lte: endDate
-      }
-    }).sort({ date: -1 });
-    
-    res.json(memories);
-  } catch (error) {
-    console.error("Error fetching memories:", error);
-    res.status(500).json({ error: "Failed to fetch memories" });
+app.get(
+  "/api/personal-memories/range/:startDate/:endDate",
+  async (req, res) => {
+    try {
+      const { startDate, endDate } = req.params;
+
+      const memories = await PersonalMemory.find({
+        date: {
+          $gte: startDate,
+          $lte: endDate,
+        },
+      }).sort({ date: -1 });
+
+      res.json(memories);
+    } catch (error) {
+      console.error("Error fetching memories:", error);
+      res.status(500).json({ error: "Failed to fetch memories" });
+    }
   }
-});
+);
 
 // Get recent memories (last N memories)
 app.get("/api/personal-memories/recent/:limit", async (req, res) => {
   try {
     const limit = parseInt(req.params.limit) || 10;
-    
+
     const memories = await PersonalMemory.find()
       .sort({ date: -1 })
       .limit(limit);
-    
+
     res.json(memories);
   } catch (error) {
     console.error("Error fetching recent memories:", error);
@@ -1249,9 +1250,9 @@ app.get("/api/personal-memories/recent/:limit", async (req, res) => {
 app.get("/api/personal-memories/with-images", async (req, res) => {
   try {
     const memories = await PersonalMemory.find({
-      imageUrl: { $ne: null }
+      imageUrl: { $ne: null },
     }).sort({ date: -1 });
-    
+
     res.json(memories);
   } catch (error) {
     console.error("Error fetching memories with images:", error);
@@ -1263,11 +1264,11 @@ app.get("/api/personal-memories/with-images", async (req, res) => {
 app.get("/api/personal-memories/search/:query", async (req, res) => {
   try {
     const query = req.params.query;
-    
+
     const memories = await PersonalMemory.find({
-      text: { $regex: query, $options: 'i' } // Case-insensitive search
+      text: { $regex: query, $options: "i" }, // Case-insensitive search
     }).sort({ date: -1 });
-    
+
     res.json(memories);
   } catch (error) {
     console.error("Error searching memories:", error);
@@ -1432,11 +1433,11 @@ app.get("/api/music", async (req, res) => {
 app.get("/api/music/date/:date", async (req, res) => {
   try {
     const musicEntry = await MusicEntry.findOne({ date: req.params.date });
-    
+
     if (!musicEntry) {
       return res.status(404).json({ error: "No music for this date" });
     }
-    
+
     res.json(musicEntry);
   } catch (error) {
     console.error("Error fetching music entry:", error);
@@ -1456,8 +1457,8 @@ app.post("/api/music", async (req, res) => {
     // Check if entry exists for this date
     const existingEntry = await MusicEntry.findOne({ date });
     if (existingEntry) {
-      return res.status(400).json({ 
-        error: "Music entry for this date already exists. Use PUT to update." 
+      return res.status(400).json({
+        error: "Music entry for this date already exists. Use PUT to update.",
       });
     }
 
@@ -1555,12 +1556,12 @@ const chessGameSchema = new mongoose.Schema({
 
 const ChessGame = mongoose.model("ChessGame", chessGameSchema);
 
-
 app.get("/api/chess/date/:date", async (req, res) => {
   try {
     const game = await ChessGame.findOne({ date: req.params.date });
 
-    if (!game) return res.status(404).json({ error: "No chess game for this date" });
+    if (!game)
+      return res.status(404).json({ error: "No chess game for this date" });
 
     res.json(game);
   } catch (err) {
@@ -1574,7 +1575,10 @@ app.post("/api/chess", async (req, res) => {
     const { date, boardState } = req.body;
 
     const exists = await ChessGame.findOne({ date });
-    if (exists) return res.status(400).json({ error: "Game already exists for this date" });
+    if (exists)
+      return res
+        .status(400)
+        .json({ error: "Game already exists for this date" });
 
     const game = new ChessGame({
       date,
@@ -1629,6 +1633,103 @@ app.post("/api/chess/undo/:id", async (req, res) => {
   } catch (err) {
     console.error("Error:", err);
     res.status(500).json({ error: "Failed to undo move" });
+  }
+});
+
+// Trip Image Schema
+const tripImageSchema = new mongoose.Schema({
+  imageUrl: {
+    type: String,
+    required: true,
+  },
+  imagePublicId: {
+    type: String,
+    required: true,
+  },
+  caption: {
+    type: String,
+    default: "",
+  },
+  location: {
+    type: String,
+    default: "",
+  },
+  date: {
+    type: Date,
+    default: Date.now,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
+const TripImage = mongoose.model("TripImage", tripImageSchema);
+
+// Trip Image Routes
+
+// Get all trip images
+app.get("/api/trip-images", async (req, res) => {
+  try {
+    const images = await TripImage.find().sort({ date: -1 });
+    res.json(images);
+  } catch (error) {
+    console.error("Error fetching trip images:", error);
+    res.status(500).json({ error: "Failed to fetch trip images" });
+  }
+});
+
+// Upload trip image
+app.post("/api/trip-images", upload.single("image"), async (req, res) => {
+  try {
+    const { caption, location, date } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ error: "Image is required" });
+    }
+
+    // Upload to Cloudinary
+    const uploadResult = await uploadToCloudinary(
+      req.file.buffer,
+      req.file.originalname
+    );
+
+    const tripImage = new TripImage({
+      imageUrl: uploadResult.secure_url,
+      imagePublicId: uploadResult.public_id,
+      caption: caption || "",
+      location: location || "",
+      date: date || new Date(),
+      createdAt: new Date(),
+    });
+
+    await tripImage.save();
+    res.status(201).json(tripImage);
+  } catch (error) {
+    console.error("Error uploading trip image:", error);
+    res.status(500).json({ error: "Failed to upload trip image" });
+  }
+});
+
+// Delete trip image
+app.delete("/api/trip-images/:id", async (req, res) => {
+  try {
+    const image = await TripImage.findById(req.params.id);
+
+    if (!image) {
+      return res.status(404).json({ error: "Image not found" });
+    }
+
+    // Delete from Cloudinary
+    if (image.imagePublicId) {
+      await deleteFromCloudinary(image.imagePublicId);
+    }
+
+    await TripImage.findByIdAndDelete(req.params.id);
+    res.json({ message: "Image deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting trip image:", error);
+    res.status(500).json({ error: "Failed to delete image" });
   }
 });
 
